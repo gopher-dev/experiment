@@ -1,0 +1,12 @@
+type Story {
+    id: ID!
+    title: String!
+}
+
+type Query {
+    FindStoryByID(id: ID!): Story!
+}
+
+schema {
+    query: Query
+}
