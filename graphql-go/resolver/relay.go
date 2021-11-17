@@ -2,7 +2,9 @@ package resolver
 
 import (
 	"bytes"
+	"encoding/json"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 
@@ -30,7 +32,7 @@ type (
 		PersistedQuery *PersistedQueryExtension `json:"persistedQuery" url:"persistedQuery"`
 	}
 
-	// a workaround for getting`variables` as a JSON string
+	// a workaround for getting `variables` as a JSON string
 	requestOptionsCompatibility struct {
 		Query         string `json:"query,omitempty" url:"query"`
 		Variables     string `json:"variables" url:"variables"`
@@ -53,9 +55,36 @@ type (
 
 // ServeEcho :nodoc:
 func (h *Handler) ServeEcho(e *echo.Echo) {
-	e.Any("/query/", func(ec echo.Context) error {
-		return nil
-	})
+	e.Any("/query/", h.QueryHandler)
+}
+
+// QueryHandler :nodoc:
+func (h Handler) QueryHandler(ec echo.Context) error {
+	var (
+		requestOptions interface{}
+	)
+
+	// read body request
+	body, err := ioutil.ReadAll(ec.Request().Body)
+	if err != nil {
+		log.WithField("context", utils.Dump(ec)).Error(err)
+		return ec.JSON(http.StatusBadRequest, err.Error())
+	}
+
+	requestOptions = parseRequestOptionsFromBody(body)
+
+	var output interface{}
+	switch opts := requestOptions.(type) {
+	case *RequestOptions:
+		// TODO
+	case []*RequestOptions:
+		// TODO
+	default:
+		log.WithField("i", utils.Dump(opts))
+		return ec.JSON(http.StatusBadRequest, opts)
+	}
+
+	return ec.JSON(http.StatusOK, output)
 }
 
 func (h *Handler) Initialize(schemaFile string, resolver *Resolver) {
@@ -97,4 +126,30 @@ func filePathWalkDir(root string) ([]string, error) {
 		return nil
 	})
 	return files, err
+}
+
+func parseRequestOptionsFromBody(body []byte) interface{} {
+	if bytes.HasPrefix(body, []byte("[")) {
+		var queries []*RequestOptions
+		err := json.Unmarshal(body, &queries)
+		if err != nil {
+			var optionsCompatible []*requestOptionsCompatibility
+			_ = json.Unmarshal(body, &optionsCompatible)
+			for i := range optionsCompatible {
+				_ = json.Unmarshal([]byte(optionsCompatible[i].Variables), &queries[i].Variables)
+			}
+			return queries
+		}
+		return queries
+	}
+
+	var query RequestOptions
+	err := json.Unmarshal(body, &query)
+	if err != nil {
+		var optionsCompatible requestOptionsCompatibility
+		_ = json.Unmarshal(body, &optionsCompatible)
+		_ = json.Unmarshal([]byte(optionsCompatible.Variables), &query.Variables)
+		return &query
+	}
+	return &query
 }
