@@ -1,0 +1,13 @@
+type Query {
+    FindStoryByID(id: ID!): Story!
+    FindAllStories(size: Int = 10): [Story!]!
+}
+
+type Mutation {
+    CreateStory(story: StoryInput!): Story!
+}
+
+schema {
+    query: Query
+    mutation: Mutation
+}

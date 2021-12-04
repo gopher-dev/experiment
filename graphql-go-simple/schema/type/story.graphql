@@ -1,0 +1,12 @@
+type Story {
+    id: ID!
+    title: String!
+    status: StoryStatus!
+    comments: [Comment!]!
+    createdAt: String!
+}
+
+enum StoryStatus {
+    PUBLISHED
+    DRAFT
+}
